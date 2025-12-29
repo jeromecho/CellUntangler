@@ -1,9 +1,8 @@
 """
 Docstring for sockeye_scripts.multi_signal_llm
 
-This is a script form of the content in `notebooks/multi_signal_celluntangler.py`
+This is a script form of content responsible for training CellUntangler and saving its embedding, found in `notebooks/multi_signal_celluntangler.py`
 """
-
 import sys
 import os
 
@@ -17,27 +16,30 @@ import scanpy as sc
 import pandas as pd
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 
 from src.data.umi_data import UMIVaeDataset
 from src.celluntangler import utils
 from src.celluntangler.models import Trainer
 from src.celluntangler.models.nb_vae import NBVAE
-from src.visualization.helpers import split_embeddings
-from src.visualization.visualization_functions import visualize_poincare_from_lorentz, visualize_embedding
-
-from src.paths.paths import ALL_CELLS_PATH 
 
 # TODO - update all paths for remote
+"""
+CONFIGURATION CONSTANTS
+"""
+EPOCHS = 50
+EPOCHS_SAVE_EVERY = 10
+EPOCH_EMBEDDINGS_SAVE_PATH = '/scratch/st-jiaruid-1/jerome/experiments/multi_signal_12_28'
 
-adata = sc.read_h5ad("../../../data/HGSOC/ALL_CELLS/all_cells_1p.h5ad")
+"""
+READING DATA
+"""
+
+adata = sc.read_h5ad("../../../data/HGSOC/ALL_CELLS/all_cells.h5ad")
 
 """
 PRE-PROCESSING
 """
-
-# Get unnormalized gene expression reads
-# REQUIREMENT: CellUntangler requires gene-expression counts
+# REQUIREMENT: Get unnormalized gene expressionr reads because CellUntangler requires gene-expression counts
 adata = adata.raw.to_adata()
 
 adata.var["gene_symbols"] = adata.var["feature_name"]
@@ -48,6 +50,10 @@ dissociation_genes_path = "../../../genes/HGSOC/multi_signal/llm_11_2025/human_c
 cell_cycle_genes = pd.read_csv(cell_cycle_genes_path, header = None, sep="\t")
 interferon_genes = pd.read_csv(interferon_genes_path, header = None, sep="\t") # PROGRESS!!!
 dissociation_genes = pd.read_csv(dissociation_genes_path, header = None, sep = "\t")
+
+cell_cycle_genes_set = set(cell_cycle_genes.iloc[:,0])
+interferon_genes_set = set(interferon_genes.iloc[:,0]) 
+dissociation_genes_set = set(dissociation_genes.iloc[:,0])
 
 contained_genes_cc = adata.var["gene_symbols"].isin(cell_cycle_genes[0])
 contained_genes_interferon = adata.var["gene_symbols"].isin(interferon_genes[0])
@@ -101,8 +107,9 @@ config = get_config()
 config.model_name = model_name
 config.seed = 68715
 config.init = "custom"
-config.max_epochs = 100 # TODO - change to 500 once verified working 
-config.epochs = 100 
+# NB: `epochs` and `max_epochs` based on what Sarah set for her interferon subspace experiment
+config.max_epochs = EPOCHS 
+config.epochs = EPOCHS
 
 if config.seed:  
     torch.manual_seed(config.seed)
@@ -132,10 +139,8 @@ x = adata.X.todense().astype(np.double)
 # y holds the batch vector for the dataset
 y = batch 
 in_dim = x.shape[1]
-print(f"in_dim = {in_dim}")
 batch_size = config.batch_size
 dataset = UMIVaeDataset(batch_size=batch_size, in_dim=in_dim)
-print(f"dataset.in_dim = {dataset.in_dim}")
 # Create the dataset loaders
 train_loader = dataset.create_loaders(x, y, seed=config.seed)
 
@@ -154,10 +159,10 @@ mask_all[adata.var["gene_symbols"].isin(dissociation_genes[0])] = 0
 
 mask = torch.tensor([mask_cyc, mask_interferon, mask_dissociation, mask_all])
 
-epoch_embeddings_save_path = ALL_CELLS_PATH
+epoch_embeddings_save_path = EPOCH_EMBEDDINGS_SAVE_PATH
 visualize_information={}
 # The epochs to save the intermediate embeddings for
-visualize_information["epochs"]=[i for i in range(0, 500, 50)] 
+visualize_information["epochs"]=[i for i in range(0, EPOCHS, EPOCHS_SAVE_EVERY)] 
 visualize_information["x"]=x
 visualize_information["y"]=y
 visualize_information["embeddings_save_path"]=epoch_embeddings_save_path
