@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os as os
 import scanpy as sc
+import pandas as pd
 
 from matplotlib.patches import Circle
 from scipy.signal import savgol_filter
@@ -14,6 +15,89 @@ from .helpers import lorentz_to_poincare
 
 tableau_colors = list(mcolors.TABLEAU_COLORS.keys())
 COLOR_NAMES = tableau_colors + list(mcolors.CSS4_COLORS.keys())
+
+# Added: custom UMAP function for visualizing higher dimensional Euclidean space 
+def visualize_embedding(
+    embedding,              # numpy array (N x 2)
+    obs_values,             # pandas Series from adata.obs
+    cmap=plt.cm.viridis,    # colormap for continuous or default
+    cat_colors=None,        # optional dict for categorical colors
+    grid_lines=False,       # optional
+    c_bar_label=None,
+    bbox_to_anchor=(1.05, 1.0),
+    point_size=8,
+    alpha=0.9,
+    title = "",
+    figsize=(7,7)
+):
+    """
+    Generic scatter plot for 2D embeddings
+    Supports both continuous and categorical obs values.
+    """
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Detect if categorical or continuous
+    is_categorical = pd.api.types.is_categorical_dtype(obs_values)
+
+    # ---------------------
+    # Categorical plotting
+    # ---------------------
+    if is_categorical:
+        categories = obs_values.cat.categories
+
+        # Use user-provided categorical colors or generate automatically
+        if cat_colors is None:
+            # map categories to colors using the given cmap
+            cat_codes = np.arange(len(categories))
+            colors = cmap(cat_codes / (len(categories)-1 if len(categories) > 1 else 1))
+            cat_colors = dict(zip(categories, colors))
+
+        for cat in categories:
+            mask = obs_values == cat
+            ax.scatter(
+                embedding[mask, 0],
+                embedding[mask, 1],
+                label=str(cat),
+                s=point_size,
+                alpha=alpha,
+                color=cat_colors[cat]
+            )
+
+        # Legend
+        ax.legend(
+            title=obs_values.name,
+            bbox_to_anchor=bbox_to_anchor,
+            loc="upper left"
+        )
+
+    # ---------------------
+    # Continuous plotting
+    # ---------------------
+    else:
+        sc = ax.scatter(
+            embedding[:, 0],
+            embedding[:, 1],
+            c=obs_values.values,
+            cmap=cmap,
+            s=point_size,
+            alpha=alpha
+        )
+        cbar = plt.colorbar(sc, ax=ax)
+        if c_bar_label:
+            cbar.set_label(c_bar_label)
+
+    # Optional grid lines
+    if grid_lines:
+        ax.grid(True, color='lightgray', linestyle='--', linewidth=0.5)
+
+    ax.set_xlabel("Dim 1")
+    ax.set_ylabel("Dim 2")
+
+    title_ax = title if title != "" else f"Embedding colored by {obs_values.name}"
+    ax.set_title(title_ax)
+
+    plt.tight_layout()
 
 
 def visualize_poincare_from_lorentz(embeddings,
