@@ -34,7 +34,9 @@ EPOCH_EMBEDDINGS_SAVE_PATH = '/scratch/st-jiaruid-1/jerome/experiments/multi_sig
 READING DATA
 """
 
+print("reading annotated dataframe...")
 adata = sc.read_h5ad("../../../data/HGSOC/ALL_CELLS/all_cells.h5ad")
+print("read annotated dataframe...")
 
 """
 PRE-PROCESSING
