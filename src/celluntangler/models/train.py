@@ -31,7 +31,7 @@ from ..components import SphericalComponent, HyperbolicComponent
 from ..ops import hyperbolics as H
 from ..stats import Stats, EpochStats
 from ..utils import CurvatureOptimizer
-
+from .training_utils import EarlyStopping
 
 class Trainer:
 
@@ -65,7 +65,9 @@ class Trainer:
                        betas: Sequence[float],
                        likelihood_n: int = 500,
                        max_epochs: int = 1000,
-                       visualize_information = None
+                       visualize_information = None,
+                       patience = 10,      
+                       min_delta = 1.0
                        ) -> Dict[int, EpochStats]:
         """
         optimizer: The optimizer.
@@ -84,6 +86,21 @@ class Trainer:
         """
         train_results = dict()
         test_results = dict()
+        early_stopper = EarlyStopping(
+            patience=patience,
+            min_delta=min_delta,
+            mode="max",
+            save_fn=lambda epoch, elbo: torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state": self.model.state_dict(),
+                    "optimizer_state": optimizer.state_dict(),
+                    "elbo": elbo,
+                },
+                os.path.join(embeddings_save_path, f"{model_name}_best_model.pt"),
+            ),
+        )
+        print("initialized early stopper")
 
         count = 0
         if visualize_information:
@@ -101,8 +118,20 @@ class Trainer:
         for _ in range(max_epochs):
             beta = self.get_beta(betas)
             train_results[self.epoch] = self._train_epoch(optimizer, train_data, beta=beta, likelihood_n=likelihood_n)
+
+            current_stats = train_results[self.epoch]
+            current_elbo = current_stats.elbo
+
+            should_stop = early_stopper.step(current_elbo, self.epoch)
+            if should_stop:
+                print(
+                    f"Early stopping at epoch {self.epoch}. "
+                    f"Best ELBO {early_stopper.best_value:.4f} "
+                    f"at epoch {early_stopper.best_epoch}."
+                )
+                break
+
             self.epoch += 1
-            
             if visualize_information:
                 self.check_visualize_information(visualize_information)
                 if count in visualize_information["epochs"]:
