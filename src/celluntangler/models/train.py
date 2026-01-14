@@ -90,6 +90,7 @@ class Trainer:
             patience=patience,
             min_delta=min_delta,
             mode="max",
+            best_value = float("-inf"),
             save_fn=lambda epoch, elbo: torch.save(
                 {
                     "epoch": epoch,
@@ -144,6 +145,8 @@ class Trainer:
                     model_name = visualize_information["model_name"]
                     bb = b.detach().to(torch.device("cpu")).numpy()
                     np.savetxt(os.path.join(embeddings_save_path, f'{model_name}_all_encode_v63_epoch_{count}_z_params.txt'), bb)
+
+                    # WHERE I AM CURRENTLY SAVING MY EMBEDDINGS
             count = count + 1
 
     def _train_epoch(self, optimizer: torch.optim.Optimizer, train_data: DataLoader, beta: float, likelihood_n: int = 500) -> EpochStats:

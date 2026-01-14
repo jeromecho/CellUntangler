@@ -9,7 +9,7 @@ class EarlyStopping:
     patience: int = 10
     min_delta: float = 0.0
     mode: str = "max"
-    best_value: float = float("inf")
+    best_value: float = float("-inf")
     best_epoch: Optional[int] = None
     epochs_no_improve: int = 0
     save_fn: Optional[Callable] = None
